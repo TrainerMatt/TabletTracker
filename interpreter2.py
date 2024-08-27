@@ -1,5 +1,5 @@
 import numpy as np
-from openpyxl import load_workbook
+from openpyxl import load_workbook,Workbook
 from datetime import datetime, timedelta
 
 
@@ -127,30 +127,52 @@ def metaprolol_func(target_date):
 
 
 
-
 def tablet_check(date: datetime, tablets):
+    # Date 10 days from now
+    check_date = date + timedelta(days=10)
+
+    try:
+        wb_current = load_workbook('CurrentData.xlsx')
+    except FileNotFoundError:
+        wb_current = Workbook()
+
+    
+    ws_current = wb_current.active
+    ws_current.title = "Tablet Status"
+    
+    # Header row
+    ws_current.append(["Tablet Name", "Tablets Left in 10 days", "Status"])
+
+    
     for tablet in tablets:
-        if start_date > date:
-            # Don't do anything if start_date is after the given date
+        if start_date > check_date:
+            # Don't do anything if start_date is after the check date
             continue
+        
+        # Calculate the projected number of tablets left in 10 days
+        projected_tablets_left = tablet.tablets_left
+        current_date = start_date
+        
+        while current_date <= check_date:
+            # Dynamically call the function corresponding to the tablet name
+            function_name = f"{tablet.name}_func"
+            if function_name in globals():
+                decrement = globals()[function_name](current_date)
+                projected_tablets_left -= decrement
+
+
+            current_date += timedelta(days=1)
+        
+        if projected_tablets_left < 0:
+            status = "Will run out in 10 days"
         else:
-            # Iterate over each date between start_date and the given date
-            current_date = start_date
-            while current_date <= date:
-                # Dynamically call the function corresponding to the tablet name
-                function_name = f"{tablet.name}_func"
-                if function_name in globals():
-                    print("here")
-                    # Assuming the function is defined and available in the global scope
-                    decrement = globals()[function_name](current_date)
-                    tablet.tablets_left -= decrement
-                
-                # Move to the next date
-                current_date += timedelta(days=1)
-            
-            # Update the tablet with the new count of tablets left
-            print(f"Updated {tablet.name}: {tablet.tablets_left} tablets left")
+            status = "Safe for the next 10 days"
 
-tablet_check(datetime(2024,12,8),tablets)
+        ws_current.append([tablet.name, projected_tablets_left, status])
+    
+    # Save the updated workbook
+    wb_current.save('CurrentData.xlsx')
 
+
+tablet_check(datetime(2024, 9, 27), tablets)
 
